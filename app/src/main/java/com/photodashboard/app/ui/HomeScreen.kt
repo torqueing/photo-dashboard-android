@@ -13,6 +13,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.CameraAlt
+import androidx.compose.material.icons.filled.Key
 import androidx.compose.material.icons.filled.PhotoLibrary
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -23,8 +24,13 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
@@ -41,7 +47,10 @@ fun HomeScreen(
     onCamera: () -> Unit,
     onGallery: () -> Unit,
     onSignOut: () -> Unit,
+    onChangePassword: suspend (String, String) -> String?,
 ) {
+    var changingPassword by remember { mutableStateOf(false) }
+    if (changingPassword) ChangePasswordDialog(onSubmit = onChangePassword, onDismiss = { changingPassword = false })
     val uploaded = photos.count { it.state == UploadState.UPLOADED || it.state == UploadState.REMOTE }
     val waiting = photos.count { it.state == UploadState.PENDING || it.state == UploadState.UPLOADING }
     val failed = photos.count { it.state == UploadState.FAILED }
@@ -79,6 +88,10 @@ fun HomeScreen(
             FilledTonalButton(onClick = onGallery, modifier = Modifier.fillMaxWidth().height(64.dp)) {
                 Icon(Icons.Filled.PhotoLibrary, null, Modifier.size(24.dp))
                 Text("  Gallery", style = MaterialTheme.typography.titleMedium)
+            }
+            TextButton(onClick = { changingPassword = true }, modifier = Modifier.fillMaxWidth()) {
+                Icon(Icons.Filled.Key, null, Modifier.size(18.dp))
+                Text("  Change password")
             }
         }
     }

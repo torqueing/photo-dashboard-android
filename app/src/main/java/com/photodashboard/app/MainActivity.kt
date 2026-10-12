@@ -104,6 +104,7 @@ private fun SignedIn(vm: AppViewModel, displayName: String) {
             onCamera = { vm.clearCapture(); stack.add(Screen.Camera) },
             onGallery = { stack.add(Screen.Gallery) },
             onSignOut = { vm.signOut() },
+            onChangePassword = vm::changePassword,
         )
         Screen.Gallery -> GalleryScreen(
             displayName = displayName,

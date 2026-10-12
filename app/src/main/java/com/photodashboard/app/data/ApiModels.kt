@@ -14,6 +14,18 @@ data class RegisterRequest(
 data class LoginRequest(val email: String, val password: String)
 
 @JsonClass(generateAdapter = true)
+data class ChangePasswordRequest(
+    @param:Json(name = "current_password") val currentPassword: String,
+    @param:Json(name = "new_password") val newPassword: String,
+)
+
+@JsonClass(generateAdapter = true)
+data class ChangePasswordResponse(
+    val ok: Boolean,
+    @param:Json(name = "other_sessions_signed_out") val otherSessionsSignedOut: Int,
+)
+
+@JsonClass(generateAdapter = true)
 data class UserDto(
     val id: Long,
     val email: String,

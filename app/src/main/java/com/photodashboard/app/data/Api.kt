@@ -29,6 +29,9 @@ interface PhotoApi {
     @GET("me")
     suspend fun me(): UserDto
 
+    @POST("auth/change-password")
+    suspend fun changePassword(@Body body: ChangePasswordRequest): ChangePasswordResponse
+
     @POST("photos/upload-url")
     suspend fun uploadUrl(@Body body: UploadUrlRequest): UploadUrlResponse
 

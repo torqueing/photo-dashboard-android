@@ -5,6 +5,7 @@ import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.photodashboard.app.BuildConfig
 import com.photodashboard.app.PhotoDashboardApp
+import com.photodashboard.app.data.ChangePasswordRequest
 import com.photodashboard.app.data.LoginRequest
 import com.photodashboard.app.data.PhotoEntity
 import com.photodashboard.app.data.RegisterRequest
@@ -107,6 +108,16 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun refresh() = launchBusy { repo.refreshFromServer() }
+
+    /** Returns null on success, else the error to show in the dialog. */
+    suspend fun changePassword(current: String, new: String): String? = try {
+        require(new.length >= 8) { "New password must be at least 8 characters" }
+        container.api.changePassword(ChangePasswordRequest(current, new))
+        _message.value = "Password changed"
+        null
+    } catch (e: Exception) {
+        e.apiMessage()
+    }
 
     fun setWifiOnly(value: Boolean) = viewModelScope.launch { container.session.setWifiOnly(value) }
 

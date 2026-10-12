@@ -69,7 +69,7 @@ class NewScreensTest {
         val photos = listOf(UploadState.UPLOADED, UploadState.UPLOADED, UploadState.PENDING).mapIndexed { i, s ->
             PhotoEntity("p$i", 1, null, null, 0, 60, null, null, null, null, null, null, null, true, null, null, null, s)
         }
-        compose.setContent { Themed { HomeScreen("George", photos, { camera = true }, { gallery = true }, {}) } }
+        compose.setContent { Themed { HomeScreen("George", photos, { camera = true }, { gallery = true }, {}, { _, _ -> null }) } }
         compose.onNodeWithText("Photo Dashboard").assertExists()
         save("2-home")
         compose.onNodeWithText("Camera", substring = true).performClick()
