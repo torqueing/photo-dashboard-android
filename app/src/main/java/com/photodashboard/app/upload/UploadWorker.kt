@@ -46,6 +46,16 @@ class UploadWorker(context: Context, params: WorkerParameters) : CoroutineWorker
             Result.success()
         } catch (e: Exception) {
             val code = (e as? HttpException)?.code()
+            if (UploadStateMachine.isAuthFailure(code)) {
+                // Re-queued by resumePending() after the user signs in again.
+                dao.update(
+                    photo.copy(
+                        state = UploadStateMachine.next(photo.state, UploadStateMachine.Event.AuthLost),
+                        lastError = "Waiting for sign-in", stage = null, progress = null,
+                    ),
+                )
+                return Result.failure()
+            }
             val retryable = e is IOException || UploadStateMachine.isRetryable(code)
             val next = UploadStateMachine.next(photo.state, UploadStateMachine.Event.Failed(retryable, attempts))
             Log.w(TAG, "upload $localId attempt $attempts failed: ${e.apiMessage()}")

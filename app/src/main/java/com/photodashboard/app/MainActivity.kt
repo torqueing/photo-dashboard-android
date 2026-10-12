@@ -29,6 +29,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.photodashboard.app.camera.CameraScreen
 import com.photodashboard.app.ui.AppViewModel
 import com.photodashboard.app.ui.AuthScreen
+import com.photodashboard.app.ui.ForcedPasswordScreen
 import com.photodashboard.app.ui.GalleryScreen
 import com.photodashboard.app.ui.HomeScreen
 import com.photodashboard.app.ui.SplashScreen
@@ -72,7 +73,9 @@ private fun App(vm: AppViewModel) {
         when (val s = session) {
             SessionState.Loading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
             SessionState.SignedOut -> AuthScreen(busy, vm.apiConfigured, vm::signIn, vm::register)
-            is SessionState.SignedIn -> SignedIn(vm, s.session.displayName)
+            is SessionState.SignedIn ->
+                if (s.session.mustChangePassword) ForcedPasswordScreen(vm::changePassword, onSignOut = { vm.signOut() })
+                else SignedIn(vm, s.session.displayName)
         }
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }

@@ -21,6 +21,9 @@ object UploadStateMachine {
         data object Succeeded : Event
         data class Failed(val retryable: Boolean, val attempts: Int) : Event
         data object RetryRequested : Event
+
+        /** Signed out or blocked by a forced password change: wait for the next sign-in. */
+        data object AuthLost : Event
     }
 
     fun next(current: UploadState, event: Event): UploadState = when (event) {
@@ -36,7 +39,10 @@ object UploadStateMachine {
             else -> UploadState.FAILED
         }
         Event.RetryRequested -> if (current == UploadState.FAILED) UploadState.PENDING else current
+        Event.AuthLost -> if (current == UploadState.UPLOADED || current == UploadState.REMOTE) current else UploadState.PENDING
     }
+
+    fun isAuthFailure(httpCode: Int?): Boolean = httpCode == 401 || httpCode == 403
 
     /** Where to resume, given what the Room row already records (AND-15). */
     fun resumeFrom(serverPhotoId: String?, objectUploaded: Boolean, registered: Boolean): UploadStep = when {

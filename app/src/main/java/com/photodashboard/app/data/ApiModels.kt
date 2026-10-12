@@ -34,6 +34,8 @@ data class UserDto(
     /** Null until a platform admin or an invite puts the user in an organisation. */
     @param:Json(name = "org_id") val orgId: Long?,
     @param:Json(name = "org_name") val orgName: String?,
+    /** Set by an org admin: the user must choose a new password before anything else. */
+    @param:Json(name = "must_change_password") val mustChangePassword: Boolean = false,
 )
 
 @JsonClass(generateAdapter = true)

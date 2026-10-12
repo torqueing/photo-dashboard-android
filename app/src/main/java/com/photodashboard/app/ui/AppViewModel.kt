@@ -94,6 +94,7 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private suspend fun afterSignIn() {
+        if (container.session.current()?.mustChangePassword == true) return
         repo.resumePending()
         runCatching { repo.refreshFromServer() }
     }
@@ -113,6 +114,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     suspend fun changePassword(current: String, new: String): String? = try {
         require(new.length >= 8) { "New password must be at least 8 characters" }
         container.api.changePassword(ChangePasswordRequest(current, new))
+        val wasForced = container.session.current()?.mustChangePassword == true
+        container.session.setMustChangePassword(false)
+        if (wasForced) afterSignIn()
         _message.value = "Password changed"
         null
     } catch (e: Exception) {

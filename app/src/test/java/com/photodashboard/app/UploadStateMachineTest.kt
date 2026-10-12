@@ -59,6 +59,16 @@ class UploadStateMachineTest {
     }
 
     @Test
+    fun authLossWaitsForSignInInsteadOfFailing() {
+        assertEquals(PENDING, sm.next(UPLOADING, Event.AuthLost))
+        assertEquals(PENDING, sm.next(FAILED, Event.AuthLost))
+        assertEquals(UPLOADED, sm.next(UPLOADED, Event.AuthLost))
+        assertTrue(sm.isAuthFailure(401))
+        assertTrue(sm.isAuthFailure(403))
+        assertFalse(sm.isAuthFailure(500))
+    }
+
+    @Test
     fun retryableCodes() {
         assertTrue(sm.isRetryable(null))
         assertTrue(sm.isRetryable(503))

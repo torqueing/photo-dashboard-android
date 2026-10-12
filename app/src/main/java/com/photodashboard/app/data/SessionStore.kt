@@ -14,7 +14,14 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "session")
 
-data class Session(val token: String, val userId: Long, val email: String, val displayName: String, val orgId: Long?)
+data class Session(
+    val token: String,
+    val userId: Long,
+    val email: String,
+    val displayName: String,
+    val orgId: Long?,
+    val mustChangePassword: Boolean = false,
+)
 
 /** Bearer token and settings (AND-2, AND-14). v1 stores the token in plain DataStore; v2 moves it to Keystore. */
 class SessionStore(private val context: Context) {
@@ -25,6 +32,7 @@ class SessionStore(private val context: Context) {
         val displayName = stringPreferencesKey("display_name")
         val orgId = longPreferencesKey("org_id")
         val wifiOnly = booleanPreferencesKey("wifi_only")
+        val mustChangePassword = booleanPreferencesKey("must_change_password")
     }
 
     @Volatile
@@ -36,6 +44,7 @@ class SessionStore(private val context: Context) {
         cachedToken = token
         if (token == null) null else Session(
             token, p[Keys.userId] ?: 0, p[Keys.email].orEmpty(), p[Keys.displayName].orEmpty(), p[Keys.orgId],
+            p[Keys.mustChangePassword] ?: false,
         )
     }
 
@@ -52,6 +61,7 @@ class SessionStore(private val context: Context) {
             it[Keys.displayName] = auth.user.displayName
             val orgId = auth.user.orgId
             if (orgId == null) it.remove(Keys.orgId) else it[Keys.orgId] = orgId
+            it[Keys.mustChangePassword] = auth.user.mustChangePassword
         }
     }
 
@@ -59,8 +69,12 @@ class SessionStore(private val context: Context) {
         cachedToken = null
         context.dataStore.edit {
             it.remove(Keys.token); it.remove(Keys.userId); it.remove(Keys.email)
-            it.remove(Keys.displayName); it.remove(Keys.orgId)
+            it.remove(Keys.displayName); it.remove(Keys.orgId); it.remove(Keys.mustChangePassword)
         }
+    }
+
+    suspend fun setMustChangePassword(value: Boolean) {
+        context.dataStore.edit { it[Keys.mustChangePassword] = value }
     }
 
     suspend fun setWifiOnly(value: Boolean) {

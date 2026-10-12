@@ -54,11 +54,23 @@ object ApiFactory {
         .writeTimeout(120, TimeUnit.SECONDS)
         .build()
 
-    fun create(baseUrl: String, client: OkHttpClient, token: () -> String?): PhotoApi {
+    fun create(
+        baseUrl: String,
+        client: OkHttpClient,
+        token: () -> String?,
+        onUnauthorized: () -> Unit = {},
+        onPasswordChangeRequired: () -> Unit = {},
+    ): PhotoApi {
         val auth = Interceptor { chain ->
             val req = chain.request()
-            val t = token()
-            chain.proceed(if (t != null) req.newBuilder().header("Authorization", "Bearer $t").build() else req)
+            val t = token() ?: return@Interceptor chain.proceed(req)
+            val resp = chain.proceed(req.newBuilder().header("Authorization", "Bearer $t").build())
+            when {
+                resp.code == 401 && !req.url.encodedPath.endsWith("/auth/logout") -> onUnauthorized()
+                resp.code == 403 && resp.peekBody(2048).string().contains("password_change_required") ->
+                    onPasswordChangeRequired()
+            }
+            resp
         }
         val logging = HttpLoggingInterceptor().apply {
             level = if (BuildConfig.DEBUG) HttpLoggingInterceptor.Level.BASIC else HttpLoggingInterceptor.Level.NONE
