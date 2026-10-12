@@ -76,11 +76,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
         afterSignIn()
     }
 
-    fun register(email: String, password: String, displayName: String, invite: String) = launchBusy {
+    fun register(email: String, password: String, displayName: String) = launchBusy {
         require(password.length >= 8) { "Password must be at least 8 characters" }
-        val auth = container.api.register(
-            RegisterRequest(email.trim(), password, displayName.trim(), invite.trim().ifBlank { null }),
-        )
+        val auth = container.api.register(RegisterRequest(email.trim(), password, displayName.trim()))
         container.session.save(auth)
         afterSignIn()
     }

@@ -8,7 +8,6 @@ data class RegisterRequest(
     val email: String,
     val password: String,
     @param:Json(name = "display_name") val displayName: String,
-    @param:Json(name = "invite_code") val inviteCode: String?,
 )
 
 @JsonClass(generateAdapter = true)
@@ -20,7 +19,8 @@ data class UserDto(
     val email: String,
     @param:Json(name = "display_name") val displayName: String,
     val role: String,
-    @param:Json(name = "org_id") val orgId: Long,
+    /** Null until a platform admin or an invite puts the user in an organisation. */
+    @param:Json(name = "org_id") val orgId: Long?,
     @param:Json(name = "org_name") val orgName: String?,
 )
 

@@ -14,7 +14,7 @@ import kotlinx.coroutines.flow.map
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "session")
 
-data class Session(val token: String, val userId: Long, val email: String, val displayName: String, val orgId: Long)
+data class Session(val token: String, val userId: Long, val email: String, val displayName: String, val orgId: Long?)
 
 /** Bearer token and settings (AND-2, AND-14). v1 stores the token in plain DataStore; v2 moves it to Keystore. */
 class SessionStore(private val context: Context) {
@@ -35,7 +35,7 @@ class SessionStore(private val context: Context) {
         val token = p[Keys.token]
         cachedToken = token
         if (token == null) null else Session(
-            token, p[Keys.userId] ?: 0, p[Keys.email].orEmpty(), p[Keys.displayName].orEmpty(), p[Keys.orgId] ?: 0,
+            token, p[Keys.userId] ?: 0, p[Keys.email].orEmpty(), p[Keys.displayName].orEmpty(), p[Keys.orgId],
         )
     }
 
@@ -50,7 +50,8 @@ class SessionStore(private val context: Context) {
             it[Keys.userId] = auth.user.id
             it[Keys.email] = auth.user.email
             it[Keys.displayName] = auth.user.displayName
-            it[Keys.orgId] = auth.user.orgId
+            val orgId = auth.user.orgId
+            if (orgId == null) it.remove(Keys.orgId) else it[Keys.orgId] = orgId
         }
     }
 

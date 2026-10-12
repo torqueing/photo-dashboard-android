@@ -37,7 +37,6 @@ import com.photodashboard.app.data.PhotoEntity
 import com.photodashboard.app.upload.UploadState
 import java.time.Instant
 import java.time.ZoneOffset
-import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 /** AND-11/12: image, capture time, coordinates, accuracy, map link, retry, delete. */
@@ -66,8 +65,7 @@ fun PhotoDetailScreen(photo: PhotoEntity?, onBack: () -> Unit, onRetry: () -> Un
             )
             StateBadge(photo.state)
             val offset = ZoneOffset.ofTotalSeconds(photo.utcOffsetMinutes * 60)
-            Field("Captured", DateTimeFormatter.ofPattern("d MMM yyyy, HH:mm:ss xxx", Locale.UK)
-                .format(Instant.ofEpochMilli(photo.capturedAt).atOffset(offset)))
+            Field("Captured", DisplayFormat.dateTime.format(Instant.ofEpochMilli(photo.capturedAt).atOffset(offset)))
             if (photo.latitude != null && photo.longitude != null) {
                 Field("Coordinates", String.format(Locale.US, "%.6f, %.6f", photo.latitude, photo.longitude))
                 photo.accuracyM?.let { Field("Accuracy", String.format(Locale.US, "± %.1f m", it)) }
