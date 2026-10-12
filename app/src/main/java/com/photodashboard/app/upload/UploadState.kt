@@ -2,6 +2,9 @@ package com.photodashboard.app.upload
 
 enum class UploadState { PENDING, UPLOADING, UPLOADED, FAILED, REMOTE }
 
+/** Sub-steps of a running upload, shown on the capture screen. */
+enum class UploadStage { CONNECTING, UPLOADING }
+
 /** Steps of one upload attempt; the worker resumes from the first one not yet done. */
 enum class UploadStep { REQUEST_URL, PUT_OBJECT, REGISTER, DONE }
 

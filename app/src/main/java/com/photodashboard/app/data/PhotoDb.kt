@@ -13,6 +13,9 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverter
 import androidx.room.TypeConverters
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
+import com.photodashboard.app.upload.UploadStage
 import com.photodashboard.app.upload.UploadState
 import kotlinx.coroutines.flow.Flow
 
@@ -43,6 +46,10 @@ data class PhotoEntity(
     val publicUrl: String? = null,
     val attempts: Int = 0,
     val lastError: String? = null,
+    /** Where the running upload is; null when no attempt is in flight. */
+    val stage: UploadStage? = null,
+    /** Bytes sent during [UploadStage.UPLOADING], 0..100. */
+    val progress: Int? = null,
 )
 
 class Converters {
@@ -51,6 +58,12 @@ class Converters {
 
     @TypeConverter
     fun toState(s: String): UploadState = UploadState.valueOf(s)
+
+    @TypeConverter
+    fun fromStage(s: UploadStage?): String? = s?.name
+
+    @TypeConverter
+    fun toStage(s: String?): UploadStage? = s?.let { UploadStage.valueOf(it) }
 }
 
 @Dao
@@ -81,15 +94,25 @@ interface PhotoDao {
 
     @Query("DELETE FROM photos WHERE localId = :id")
     suspend fun delete(id: String)
+
+    @Query("UPDATE photos SET stage = :stage, progress = :progress WHERE localId = :id")
+    suspend fun setStage(id: String, stage: UploadStage?, progress: Int?)
 }
 
-@Database(entities = [PhotoEntity::class], version = 1, exportSchema = true)
+@Database(entities = [PhotoEntity::class], version = 2, exportSchema = true)
 @TypeConverters(Converters::class)
 abstract class PhotoDb : RoomDatabase() {
     abstract fun photos(): PhotoDao
 
     companion object {
+        val MIGRATION_1_2 = object : Migration(1, 2) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE photos ADD COLUMN stage TEXT")
+                db.execSQL("ALTER TABLE photos ADD COLUMN progress INTEGER")
+            }
+        }
+
         fun create(context: Context): PhotoDb =
-            Room.databaseBuilder(context, PhotoDb::class.java, "photos.db").build()
+            Room.databaseBuilder(context, PhotoDb::class.java, "photos.db").addMigrations(MIGRATION_1_2).build()
     }
 }

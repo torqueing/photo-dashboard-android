@@ -30,10 +30,14 @@ import com.photodashboard.app.camera.CameraScreen
 import com.photodashboard.app.ui.AppViewModel
 import com.photodashboard.app.ui.AuthScreen
 import com.photodashboard.app.ui.GalleryScreen
+import com.photodashboard.app.ui.HomeScreen
+import com.photodashboard.app.ui.SplashScreen
 import com.photodashboard.app.ui.PhotoDetailScreen
 import com.photodashboard.app.ui.SessionState
 
 sealed interface Screen {
+    data object Splash : Screen
+    data object Home : Screen
     data object Gallery : Screen
     data object Camera : Screen
     data class Detail(val localId: String) : Screen
@@ -76,29 +80,50 @@ private fun App(vm: AppViewModel) {
 
 @Composable
 private fun SignedIn(vm: AppViewModel, displayName: String) {
-    val stack = remember { mutableStateListOf<Screen>(Screen.Gallery) }
+    val stack = remember { mutableStateListOf(if (vm.splashPending) Screen.Splash else Screen.Home) }
+    val captureStatus by vm.captureStatus.collectAsStateWithLifecycle()
     val photos by vm.photos.collectAsStateWithLifecycle()
     val wifiOnly by vm.wifiOnly.collectAsStateWithLifecycle()
     LaunchedEffect(Unit) { vm.refresh() }
     // Predictive back: the system animation is driven by OnBackPressedDispatcher.
     BackHandler(enabled = stack.size > 1) { stack.removeAt(stack.lastIndex) }
 
+    fun goTo(vararg screens: Screen) {
+        stack.clear()
+        stack.addAll(screens)
+    }
+
     when (val screen = stack.last()) {
+        Screen.Splash -> SplashScreen(onDone = {
+            vm.splashPending = false
+            goTo(Screen.Home)
+        })
+        Screen.Home -> HomeScreen(
+            displayName = displayName,
+            photos = photos,
+            onCamera = { vm.clearCapture(); stack.add(Screen.Camera) },
+            onGallery = { stack.add(Screen.Gallery) },
+            onSignOut = { vm.signOut() },
+        )
         Screen.Gallery -> GalleryScreen(
             displayName = displayName,
             photos = photos,
             wifiOnly = wifiOnly,
             onWifiOnly = vm::setWifiOnly,
             onOpen = { stack.add(Screen.Detail(it.localId)) },
-            onCamera = { stack.add(Screen.Camera) },
+            onCamera = { vm.clearCapture(); stack.add(Screen.Camera) },
             onRefresh = { vm.refresh() },
             onSignOut = { vm.signOut() },
         )
         Screen.Camera -> CameraScreen(
             newFile = vm::newCaptureFile,
             locationFix = vm::locationFix,
+            onTaken = vm::onPhotoTaken,
             onCaptured = { file, at, fix -> vm.onCaptured(file, at, fix) },
             onBack = { stack.removeAt(stack.lastIndex) },
+            captureStatus = captureStatus,
+            onGallery = { goTo(Screen.Home, Screen.Gallery) },
+            onRetry = { vm.capturedLocalId?.let(vm::retry) },
         )
         is Screen.Detail -> {
             val photoFlow = remember(screen.localId) { vm.photo(screen.localId) }

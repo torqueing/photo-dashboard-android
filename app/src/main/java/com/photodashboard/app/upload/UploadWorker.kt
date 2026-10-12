@@ -42,14 +42,16 @@ class UploadWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         dao.update(photo)
         return try {
             photo = upload(photo)
-            dao.update(photo.copy(state = UploadState.UPLOADED, lastError = null))
+            dao.update(photo.copy(state = UploadState.UPLOADED, lastError = null, stage = null, progress = null))
             Result.success()
         } catch (e: Exception) {
             val code = (e as? HttpException)?.code()
             val retryable = e is IOException || UploadStateMachine.isRetryable(code)
             val next = UploadStateMachine.next(photo.state, UploadStateMachine.Event.Failed(retryable, attempts))
             Log.w(TAG, "upload $localId attempt $attempts failed: ${e.apiMessage()}")
-            dao.update(photo.copy(state = next, lastError = e.apiMessage()))
+            // A final failure keeps the stage it failed in, for the capture status bar.
+            val failedIn = if (next == UploadState.FAILED) dao.get(localId)?.stage else null
+            dao.update(photo.copy(state = next, lastError = e.apiMessage(), stage = failedIn, progress = null))
             if (next == UploadState.PENDING) Result.retry() else Result.failure()
         }
     }
@@ -58,15 +60,23 @@ class UploadWorker(context: Context, params: WorkerParameters) : CoroutineWorker
         val api = container.api
         val dao = container.db.photos()
         val file = File(requireNotNull(start.filePath) { "photo has no local file" })
+        dao.setStage(start.localId, UploadStage.CONNECTING, null)
         // Reuse the photo_id from an earlier attempt so retries never create duplicates (AND-15).
         val url = api.uploadUrl(UploadUrlRequest(start.serverPhotoId))
-        var photo = start.copy(serverPhotoId = url.photoId, s3Key = url.s3Key, publicUrl = url.publicUrl)
+        var photo = start.copy(
+            serverPhotoId = url.photoId, s3Key = url.s3Key, publicUrl = url.publicUrl,
+            stage = UploadStage.UPLOADING, progress = 0,
+        )
         dao.update(photo)
         if (url.status == "uploaded") return photo
 
+        val body = ProgressRequestBody(file.asRequestBody(JPEG)) { percent ->
+            // Called on OkHttp's writer thread; Room's blocking write is fine there.
+            kotlinx.coroutines.runBlocking { dao.setStage(start.localId, UploadStage.UPLOADING, percent) }
+        }
         val put = Request.Builder()
             .url(url.uploadUrl)
-            .put(file.asRequestBody(JPEG))
+            .put(body)
             .build()
         container.http.newCall(put).execute().use { resp ->
             if (!resp.isSuccessful) throw IOException("S3 PUT failed: HTTP ${resp.code}")

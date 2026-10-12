@@ -52,6 +52,8 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.photodashboard.app.exif.GeoFix
+import com.photodashboard.app.ui.CaptureStatusBar
+import com.photodashboard.app.upload.CaptureStatus
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -70,8 +72,12 @@ private val PERMISSIONS = arrayOf(
 fun CameraScreen(
     newFile: () -> File,
     locationFix: suspend () -> GeoFix?,
+    onTaken: () -> Unit,
     onCaptured: (File, Long, GeoFix?) -> Unit,
     onBack: () -> Unit,
+    captureStatus: CaptureStatus?,
+    onGallery: () -> Unit,
+    onRetry: () -> Unit,
 ) {
     val context = LocalContext.current
     fun granted(p: String) = ContextCompat.checkSelfPermission(context, p) == PackageManager.PERMISSION_GRANTED
@@ -161,6 +167,14 @@ fun CameraScreen(
                 Icon(icon, "Flash mode", tint = Color.White)
             }
         }
+        if (captureStatus != null) {
+            CaptureStatusBar(
+                status = captureStatus,
+                onGallery = onGallery,
+                onRetry = onRetry,
+                modifier = Modifier.align(Alignment.TopCenter).safeDrawingPadding().padding(top = 64.dp, start = 12.dp, end = 12.dp),
+            )
+        }
         Row(
             Modifier.align(Alignment.BottomCenter).fillMaxWidth().safeDrawingPadding().padding(bottom = 24.dp),
             horizontalArrangement = Arrangement.SpaceEvenly,
@@ -184,6 +198,7 @@ fun CameraScreen(
                                 val file = newFile()
                                 val takenAt = System.currentTimeMillis()
                                 imageCapture.takePictureTo(file, context)
+                                onTaken()
                                 onCaptured(file, takenAt, fix.await())
                             } catch (e: Exception) {
                                 Log.e("CameraScreen", "capture failed", e)

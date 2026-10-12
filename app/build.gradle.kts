@@ -8,11 +8,16 @@ plugins {
 
 // API base URL: the `api_base_url` Terraform output. Read from the API_BASE_URL
 // environment variable (GitHub Actions secret) or `api.base.url` in the untracked
-// local.properties. Never committed: this repository is public.
+// local.properties, falling back to the dev environment so a fresh clone runs.
 val localProps = Properties().apply {
     rootProject.file("local.properties").takeIf { it.exists() }?.inputStream()?.use { load(it) }
 }
-val apiBaseUrl: String = (System.getenv("API_BASE_URL") ?: localProps.getProperty("api.base.url") ?: "")
+val defaultApiBaseUrl = "https://d1yjjdfglob9yx.cloudfront.net/v1"
+val apiBaseUrl: String = (
+    System.getenv("API_BASE_URL")?.takeIf { it.isNotBlank() }
+        ?: localProps.getProperty("api.base.url")?.takeIf { it.isNotBlank() }
+        ?: defaultApiBaseUrl
+)
     .trim().trimEnd('/')
 
 android {
@@ -94,6 +99,9 @@ dependencies {
 
     testImplementation(libs.junit)
     testImplementation(libs.kotlinx.coroutines.test)
+    androidTestImplementation(platform(libs.androidx.compose.bom))
+    androidTestImplementation(libs.androidx.compose.ui.test.junit4)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.test.core)
     androidTestImplementation(libs.androidx.test.runner)
@@ -107,3 +115,6 @@ dependencies {
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
 }
+
+// Room migration tests read the exported schemas.
+android.sourceSets.getByName("androidTest").assets.directories.add("$projectDir/schemas")

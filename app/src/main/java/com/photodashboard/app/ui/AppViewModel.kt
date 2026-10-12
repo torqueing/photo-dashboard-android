@@ -11,6 +11,9 @@ import com.photodashboard.app.data.RegisterRequest
 import com.photodashboard.app.data.Session
 import com.photodashboard.app.data.apiMessage
 import com.photodashboard.app.exif.GeoFix
+import com.photodashboard.app.upload.CaptureProgress
+import com.photodashboard.app.upload.CaptureStatus
+import com.photodashboard.app.upload.CaptureStep
 import com.photodashboard.app.upload.UploadWorker
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
@@ -20,9 +23,12 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.flowOf
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.io.File
+
+data class CaptureTracking(val localId: String?)
 
 sealed interface SessionState {
     data object Loading : SessionState
@@ -36,6 +42,9 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
     private val repo = container.repository
 
     val apiConfigured = BuildConfig.API_BASE_URL.isNotBlank()
+
+    /** The splash plays once per app launch and again after each sign-in. */
+    var splashPending = true
 
     val session: StateFlow<SessionState> = MutableStateFlow<SessionState>(SessionState.Loading).also { state ->
         viewModelScope.launch {
@@ -90,6 +99,8 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     /** AND-3: revoke the token, stop pending uploads, keep local photos. */
     fun signOut() = viewModelScope.launch {
+        splashPending = true
+        _capture.value = null
         UploadWorker.cancelAll(getApplication())
         runCatching { container.api.logout() }
         container.session.clear()
@@ -103,11 +114,38 @@ class AppViewModel(app: Application) : AndroidViewModel(app) {
 
     suspend fun locationFix(): GeoFix? = container.location.fixForCapture()
 
+    /** The capture whose progress the camera screen shows; null before the first shot. */
+    private val _capture = MutableStateFlow<CaptureTracking?>(null)
+
+    val captureStatus: StateFlow<CaptureStatus?> = _capture
+        .flatMapLatest { c ->
+            when {
+                c == null -> flowOf(null)
+                c.localId == null -> flowOf(CaptureStatus(CaptureStep.TAKEN))
+                else -> container.db.photos().observeOne(c.localId).map { p ->
+                    CaptureProgress.status(p != null, p?.state, p?.stage, p?.progress, p?.lastError)
+                }
+            }
+        }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), null)
+
+    val capturedLocalId: String? get() = _capture.value?.localId
+
+    fun onPhotoTaken() {
+        _capture.value = CaptureTracking(localId = null)
+    }
+
+    fun clearCapture() {
+        _capture.value = null
+    }
+
     fun onCaptured(file: File, capturedAt: Long, fix: GeoFix?) = viewModelScope.launch {
         try {
-            repo.onCaptured(file, capturedAt, fix)
+            val photo = repo.onCaptured(file, capturedAt, fix)
+            _capture.value = CaptureTracking(localId = photo.localId)
             if (fix == null) _message.value = "Saved without location"
         } catch (e: Exception) {
+            _capture.value = null
             _message.value = "Could not save photo: ${e.apiMessage()}"
         }
     }
